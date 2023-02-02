@@ -40,6 +40,7 @@ from game import Actions
 import util
 import time
 import search
+import sys
 
 class GoWestAgent(Agent):
     "An agent that goes West until it can't."
@@ -383,10 +384,30 @@ def cornersHeuristic(state, problem):
     
     pos, corners = state
 
-    return 0 # Default to trivial solution
+    corners_dict = dict()
+    for corner in corners:
+        corners_dict[hash(corner)] = corner
+
+    optimalDistance = 0
+    while len(corners_dict) > 0:
+
+        min_dist = sys.maxsize
+        pos_at_min = None
+        
+        for adj_corner in corners_dict.values():
+            manhattan_d = getManhattanDistance(pos, adj_corner)
+            if(manhattan_d < min_dist):
+                min_dist = manhattan_d
+                pos_at_min = adj_corner
+
+        pos = pos_at_min
+        optimalDistance += min_dist
+        corners_dict.pop(hash(pos))
+
+    return optimalDistance # Default to trivial solution
 
 def getManhattanDistance(p1, p2):
-    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])s
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
@@ -478,9 +499,27 @@ def foodHeuristic(state, problem):
     Subsequent calls to this heuristic can access
     problem.heuristicInfo['wallCount']
     """
+    walls = problem.walls
     position, foodGrid = state
+    
     "*** YOUR CODE HERE ***"
-    return 0
+    foodList = foodGrid.asList()
+    if(len(foodList) == 0):
+        return 0
+
+    minDist,foodPos = findClosestFood(position, foodList)
+    heuristic = mazeDistance(position, foodPos, problem.startingGameState)
+    return heuristic
+
+def findClosestFood(pos, foodPositions):
+    minDist = sys.maxsize
+    minFoodPosition = None
+    for foodPos in foodPositions:
+        d = getManhattanDistance(pos, foodPos)
+        if(d < minDist):
+            minDist = d
+            minFoodPosition = foodPos
+    return (minDist, minFoodPosition)
 
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
@@ -510,9 +549,13 @@ class ClosestDotSearchAgent(SearchAgent):
         walls = gameState.getWalls()
         problem = AnyFoodSearchProblem(gameState)
 
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        foodList = food.asList()
+        if(len(foodList) == 0):
+            return []
 
+        "*** YOUR CODE HERE ***"
+        return search.bfs(problem)
+    
 class AnyFoodSearchProblem(PositionSearchProblem):
     """
     A search problem for finding a path to any food.
@@ -547,7 +590,7 @@ class AnyFoodSearchProblem(PositionSearchProblem):
         x,y = state
 
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        return self.food[x][y]
 
 def mazeDistance(point1, point2, gameState):
     """
