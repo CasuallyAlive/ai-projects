@@ -14,7 +14,7 @@
 
 from util import manhattanDistance
 from game import Directions
-import random, util
+import random, util, sys
 
 from game import Agent
 
@@ -70,17 +70,41 @@ class ReflexAgent(Agent):
         successorGameState = currentGameState.generatePacmanSuccessor(action)
         newPos = successorGameState.getPacmanPosition()
         newFood = successorGameState.getFood()
-        newGhostStates = successorGameState.getGhostStates()
-        newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
+        min_distance = getClosestFood(newPos,newFood.asList())
+        
+        newGhostStates = successorGameState.getGhostStates()
+
+        ghostDistances = 0
+        for ghost in newGhostStates:
+            distanceFromPacman = manhattanDistance(newPos, ghost.getPosition())
+            ghostPos = ghost.getPosition()
+            if distanceFromPacman <= 3 and ghost.scaredTimer == 0:
+                ghostDistances = -sys.maxsize-1
+                break
+            ghostDistances += distanceFromPacman+ghost.scaredTimer
+              
+
+        newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
         "*** YOUR CODE HERE ***"
-        return successorGameState.getScore()
+        return successorGameState.getScore() + ghostDistances - min_distance
+
+# Gets position of food closest to pacman
+def getClosestFood(pacmanPos, foodPositions):
+    min_d = sys.maxsize
+    for foodPos in foodPositions:
+        temp_d = manhattanDistance(pacmanPos, foodPos)
+        if temp_d < min_d:
+            min_d = temp_d
+    if(min_d == sys.maxsize):
+        return 0
+    return min_d
 
 def scoreEvaluationFunction(currentGameState):
     """
     This default evaluation function just returns the score of the state.
     The score is the same one displayed in the Pacman GUI.
-
+ 
     This evaluation function is meant for use with adversarial search agents
     (not reflex agents).
     """
@@ -110,6 +134,30 @@ class MinimaxAgent(MultiAgentSearchAgent):
     """
     Your minimax agent (question 2)
     """
+    # Recursive minimax function
+    
+    def miniMax(self, state, depth, agent):
+        if state.isLose() or state.isWin() or depth == self.depth:
+            return (self.evaluationFunction(state), None)
+        if agent == 0:
+            maxVal = -sys.maxsize
+            maxAction = None
+            for action in state.getLegalActions(agent):
+                newScore, _ = self.miniMax(state.generateSuccessor(agent, action), depth, 1)
+                maxAction = action if maxVal <= newScore else maxAction
+                maxVal = max(maxVal, newScore)
+            return (maxVal, maxAction)
+        else:
+            nextAgent = agent + 1 if agent <= state.getNumAgents()-2 else 0
+            depth = depth + 1 if nextAgent == 0 else depth
+            minVal = sys.maxsize
+            minAction = None
+            for action in state.getLegalActions(agent):
+                newScore, _ = self.miniMax(state.generateSuccessor(agent, action), depth, nextAgent)     
+                minAction = action if minVal >= newScore else minAction
+                minVal = min(minVal, newScore)
+            return (minVal, minAction) 
+        
 
     def getAction(self, gameState):
         """
@@ -135,7 +183,8 @@ class MinimaxAgent(MultiAgentSearchAgent):
         Returns whether or not the game state is a losing state
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        score, action = self.miniMax(gameState, 0, self.index)
+        return action
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -147,7 +196,45 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        score, action = self.fastMiniMax(gameState, 0, -sys.maxsize, sys.maxsize, self.index)
+        return action
+    
+    def fastMiniMax(self, state, depth, alpha, beta, agent):
+        isMax = agent == 0
+        if state.isLose() or state.isWin() or depth == self.depth:
+            return self.evaluationFunction(state), None
+        if isMax:
+            val, maxAction, alpha = self.max_v(state, depth, agent, alpha, beta)
+            return val, maxAction
+        else:
+            val, minAction, beta = self.min_v(state, depth, agent, alpha, beta)
+            return val, minAction
+        
+    def max_v(self, state, depth, agent, alpha, beta):
+        maxVal = -sys.maxsize
+        maxAction = None
+        for action in state.getLegalActions(agent):
+            newScore, _ = self.fastMiniMax(state.generateSuccessor(agent, action), depth, alpha, beta, 1)
+            maxAction = action if maxVal <= newScore else maxAction
+            maxVal = max(maxVal, newScore)
+            if(maxVal > beta):
+                return maxVal, maxAction, alpha
+            alpha = max(alpha, maxVal)
+        return maxVal, maxAction, alpha
+
+    def min_v(self, state, depth, agent, alpha, beta):
+        nextAgent = agent + 1 if agent <= state.getNumAgents()-2 else 0
+        depth = depth + 1 if nextAgent == 0 else depth
+        minVal = sys.maxsize
+        minAction = None
+        for action in state.getLegalActions(agent):
+            newScore, _ = self.fastMiniMax(state.generateSuccessor(agent, action), depth, alpha, beta, nextAgent)     
+            minAction = action if minVal >= newScore else minAction
+            minVal = min(minVal, newScore)
+            if(minVal < alpha):
+                return minVal, minAction, beta
+            beta = min(beta, minVal)
+        return minVal, minAction, beta
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
