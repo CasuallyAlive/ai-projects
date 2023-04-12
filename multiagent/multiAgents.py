@@ -239,6 +239,22 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
       Your expectimax agent (question 4)
+
+        gameState.getLegalActions(agentIndex):
+        Returns a list of legal actions for an agent
+        agentIndex=0 means Pacman, ghosts are >= 1
+
+        gameState.generateSuccessor(agentIndex, action):
+        Returns the successor game state after an agent takes an action
+
+        gameState.getNumAgents():
+        Returns the total number of agents in the game
+
+        gameState.isWin():
+        Returns whether or not the game state is a winning state
+
+        gameState.isLose():
+        Returns whether or not the game state is a losing state
     """
 
     def getAction(self, gameState):
@@ -249,8 +265,50 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         legal moves.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        agent = self.index
+        if agent != 0:
+            return random.choice(gameState.getLegalActions(agent))
 
+        return self.expectimax(gameState, agent, 0)[1]
+    
+    def expectimax(self, state, agent, depth):
+        isMax = agent == 0
+
+        if(depth == self.depth or state.isWin() or state.isLose()):
+            return self.evaluationFunction(state), None
+        
+        if(isMax):
+            return self.max_v(state, agent, depth)
+        
+        return self.chance_v(state, agent, depth)
+        
+        
+    
+    def chance_v(self, state, agent, depth):
+        nextAgent = agent + 1 if agent <= state.getNumAgents()-2 else 0
+        nextDepth = depth + 1 if nextAgent == 0 else depth
+        legalMoves = state.getLegalActions(agent)
+
+        prob = 1.0 / float(len(legalMoves))
+        expectedValue = float()
+        for action in legalMoves:
+            nextState = state.generateSuccessor(agent, action)
+            val, _ = self.expectimax(nextState, nextAgent, nextDepth)
+            expectedValue += prob*val
+
+        return expectedValue, None
+
+    def max_v(self, state, agent, depth):
+
+        legalMoves = state.getLegalActions(agent)
+        results = []
+        for action in legalMoves:
+            nextState = state.generateSuccessor(agent, action)
+            expectedVal, _ = self.expectimax(nextState, 1, depth)
+            results.append((expectedVal, action))
+
+        return max(results, key=lambda t: t[0])
+        
 def betterEvaluationFunction(currentGameState):
     """
     Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
@@ -258,8 +316,40 @@ def betterEvaluationFunction(currentGameState):
 
     DESCRIPTION: <write something here so we know what you did>
     """
+    """
+        gameState.getLegalActions(agentIndex):
+        Returns a list of legal actions for an agent
+        agentIndex=0 means Pacman, ghosts are >= 1
+
+        gameState.generateSuccessor(agentIndex, action):
+        Returns the successor game state after an agent takes an action
+
+        gameState.getNumAgents():
+        Returns the total number of agents in the game
+
+        gameState.isWin():
+        Returns whether or not the game state is a winning state
+
+        gameState.isLose():
+        Returns whether or not the game state is a losing state
+    """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    pacmanPos = currentGameState.getPacmanPosition()
+    food = currentGameState.getFood()
+    ghostStates = currentGameState.getGhostStates()
+
+    ghostVal = min([getGhostVal(ghost, pacmanPos) for ghost in ghostStates])
+
+    return currentGameState.getScore() + ghostVal - getClosestFood(pacmanPos, food.asList())
+
+
+
+def getGhostVal(ghost, pacPos):
+    pgDistance = manhattanDistance(ghost.getPosition(), pacPos)
+    if(pgDistance <= 1):
+        v = sys.maxsize if ghost.scaredTimer >= 1 else -sys.maxsize
+        return v
+    return 0
 
 # Abbreviation
 better = betterEvaluationFunction
